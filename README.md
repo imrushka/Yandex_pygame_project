@@ -1,0 +1,1 @@
+# Yandex_pygame_project
