@@ -7,17 +7,21 @@ clock = pygame.time.Clock()
 
 #класс корабля
 class Space_ship(pygame.sprite.Sprite):
-    def __init__(self, path, pos_x, pos_y):
+    def __init__(self, ind, pos_x, pos_y):
         super().__init__()
-        self.image = pygame.image.load(path)
+        self.ships_angles = ["player.png", "playerRight.png", "playerLeft.png"]
+        self.image = pygame.image.load(self.ships_angles[ind])
         self.rect = self.image.get_rect()
         self.rect.center = [pos_x, pos_y]
         self.mask = pygame.mask.from_surface(self.image)
         self.bullets_paths = ["laserGreen.png", "laserRed.png"]
         self.laser = pygame.mixer.Sound("laserfire01.ogg")
 
-    def update(self, pos_x, pos_y):
-        self.rect.center = (pos_x, pos_y)
+    def update(self, pos_x, pos_y, ind):
+        self.image = pygame.image.load(self.ships_angles[ind])
+        self.rect = self.image.get_rect()
+        self.rect.center = [pos_x, pos_y]
+        self.mask = pygame.mask.from_surface(self.image)
 
     def shoot(self):
         self.laser.play()
@@ -47,6 +51,19 @@ class Bullet(pygame.sprite.Sprite):
                 self.kill()
                 sprite_m.kill()
                 print('bullet hit')
+
+
+class muzzle_flash(pygame.sprite.Sprite):
+    def __init__(self, pos_x, pos_y, path):
+        super().__init__()
+        self.image = pygame.image.load(path)
+        self.rect = self.image.get_rect()
+        self.rect.center = [pos_x, pos_y]
+        self.mask = pygame.mask.from_surface(self.image)
+
+    def update(self):
+        pass
+
 
 #класс метеорита
 class Meteor(pygame.sprite.Sprite):
@@ -87,7 +104,7 @@ background_surface = pygame.image.load("background_space.jpg")
 background_surface = pygame.transform.scale(background_surface, (1000, 700))
 
 #группа для корабля
-space_ship = Space_ship("player.png", 500, 600)
+space_ship = Space_ship(0, 500, 600)
 space_ship_group = pygame.sprite.Group()
 space_ship_group.add(space_ship)
 
@@ -116,6 +133,7 @@ ship_velocity = 2
 
 game_difficulty = 0
 
+cur_angle = 0
 
 while True:
     #отлавливаем события
@@ -130,9 +148,11 @@ while True:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                 right = True
+                cur_angle = 1
 
             if event.key == pygame.K_LEFT or event.key == pygame.K_a:
                 left = True
+                cur_angle = 2
 
             if event.key == pygame.K_DOWN or event.key == pygame.K_s:
                 down = True
@@ -143,9 +163,11 @@ while True:
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                 right = False
+                cur_angle = 0
 
             if event.key == pygame.K_LEFT or event.key == pygame.K_a:
                 left = False
+                cur_angle = 0
 
             if event.key == pygame.K_DOWN or event.key == pygame.K_s:
                 down = False
@@ -182,7 +204,7 @@ while True:
     screen.blit(background_surface, (0, 0))
 
     space_ship_group.draw(screen)
-    space_ship_group.update(cur_pos_x, cur_pos_y)
+    space_ship_group.update(cur_pos_x, cur_pos_y, cur_angle)
 
     bullets.draw(screen)
     bullets.update()
