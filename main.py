@@ -12,6 +12,7 @@ class Space_ship(pygame.sprite.Sprite):
         self.image = pygame.image.load(path)
         self.rect = self.image.get_rect()
         self.rect.center = [pos_x, pos_y]
+        self.mask = pygame.mask.from_surface(self.image)
         self.bullets_paths = ["laserGreen.png", "laserRed.png"]
         self.laser = pygame.mixer.Sound("laserfire01.ogg")
 
@@ -33,6 +34,7 @@ class Bullet(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = [pos_x, pos_y]
         self.velocity = velocity
+        self.mask = pygame.mask.from_surface(self.image)
 
     def update(self):
         self.rect.y -= self.velocity
@@ -40,14 +42,21 @@ class Bullet(pygame.sprite.Sprite):
         #проверяем на выход за границы экрана
         if self.rect.y < -10:
             self.kill()
+        for sprite_m in meteors:
+            if pygame.sprite.collide_mask(self, sprite_m):
+                self.kill()
+                sprite_m.kill()
+                print('bullet hit')
 
 #класс метеорита
 class Meteor(pygame.sprite.Sprite):
-    def __init__(self, pos_x, pos_y):
+    def __init__(self, pos_x, pos_y, type_of_meteor):
         super().__init__()
-        self.image = pygame.image.load("meteorBig.png")
+        self.meteors_types = ["meteorBig.png", "meteorSmall.png"]
+        self.image = pygame.image.load(self.meteors_types[type_of_meteor])
         self.rect = self.image.get_rect()
         self.rect.center = [pos_x, pos_y]
+        self.mask = pygame.mask.from_surface(self.image)
 
     def update(self):
         self.rect.y += 2
@@ -55,6 +64,10 @@ class Meteor(pygame.sprite.Sprite):
         #проверяем на воход за границы и удаляем
         if self.rect.y >= screen_l + 10:
             self.kill()
+
+        if pygame.sprite.collide_mask(self, space_ship):
+            print('collision with meteor')
+
 
 def keep_in_frame(type, num):
     if type == 1:
@@ -99,7 +112,11 @@ down = False
 right = False
 left = False
 
-ship_velocity = 5
+ship_velocity = 2
+
+game_difficulty = 0
+
+
 while True:
     #отлавливаем события
     for event in pygame.event.get():
@@ -140,8 +157,12 @@ while True:
         if event.type == pygame.MOUSEBUTTONDOWN:
             space_ship.shoot()
             bullets.add(space_ship.create_bullet(random.randrange(0, 2, 1), 5))
+
+        #генерим метеориты
         if event.type == SAPWNMETEOR:
-            meteors.add(Meteor(random.randrange(30, screen_w - 30), -10))
+            for met in range(random.randrange(6)):
+                meteors.add(Meteor(random.randrange(30, screen_w - 30), -1 * random.randrange(20, 500, 1), random.randint(0, 1)))
+
 
     #двигаем корабль
     if up:
