@@ -1,6 +1,9 @@
-import pygame, sys, random
+import random
+import sys
 
-# инициализация
+import pygame
+
+# инициализация базовых вещей
 screen_w, screen_l = 1000, 700
 pygame.init()
 screen = pygame.display.set_mode((screen_w, screen_l))
@@ -11,13 +14,20 @@ clock = pygame.time.Clock()
 class Space_ship(pygame.sprite.Sprite):
     def __init__(self, ind, pos_x, pos_y):
         super().__init__()
-        self.ships_angles = ["player.png", "playerRight.png", "playerLeft.png", "playerDamaged.png"]
+        # массив картинок для анимации
+        self.ships_angles = ["player.png", "playerRight.png", "playerLeft.png"]
+        # грузим картинки
         self.image = pygame.image.load(self.ships_angles[ind]).convert_alpha()
+        # распологаем картинку
         self.rect = self.image.get_rect()
         self.rect.center = [pos_x, pos_y]
+        # снимаем маску для проверки столкновений
         self.mask = pygame.mask.from_surface(self.image)
+        # массив картинок для разных пуль
         self.bullets_paths = ["laserGreen.png", "laserRed.png"]
+        # массив разных звуков стрельбы
         self.laser = pygame.mixer.Sound("laserfire01.ogg")
+        #звук для стрельбы при путой обойме(нет пуль)
         self.beep_sound = [pygame.mixer.Sound("synth_beep_01.ogg"), pygame.mixer.Sound("synth_beep_02.ogg")]
 
     # логика и движение
@@ -27,31 +37,38 @@ class Space_ship(pygame.sprite.Sprite):
         self.rect.center = [pos_x, pos_y]
         self.mask = pygame.mask.from_surface(self.image)
 
+    # звук стрельбы
     def shoot(self):
         self.laser.play()
 
+    # звук для пустого магазина
     def beep(self):
         self.beep_sound[random.randrange(len(self.beep_sound))].play()
 
+    # создаем пулю
     def create_bullet(self, ind, velocity_y, velocity_x):
-        return Bullet(self.rect.x + 49, self.rect.y, self.bullets_paths[ind], velocity_y, velocity_x)
+        stats.bullet_count += 1
+        return Bullet(self.rect.centerx, self.rect.y, self.bullets_paths[ind], velocity_y, velocity_x)
 
+    # для получения координат
     def get_x(self):
-        return self.rect.x
+        return self.rect.centerx
 
     def get_y(self):
-        return self.rect.y
+        return self.rect.centery
 
 
 # класс лазерного выстрела
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y, path, velocity_y, velocity_x=0):
         super().__init__()
+        #грузим и рапологаем картинку
         self.image = pygame.image.load(path).convert_alpha()
         self.rect = self.image.get_rect()
         self.rect.center = [pos_x, pos_y]
         self.vel_x, self.vel_y = velocity_x, velocity_y
         self.mask = pygame.mask.from_surface(self.image)
+        #для разных звуков
         self.sounds = [
             pygame.mixer.Sound("retro_explosion_01.ogg"),
             pygame.mixer.Sound("retro_explosion_02.ogg"),
@@ -59,6 +76,7 @@ class Bullet(pygame.sprite.Sprite):
             pygame.mixer.Sound("retro_explosion_04.ogg"),
             pygame.mixer.Sound("retro_explosion_05.ogg")]
 
+    #воспроизводим звук
     def hit_sound(self):
         self.sounds[random.randrange(len(self.sounds))].play()
 
@@ -68,6 +86,7 @@ class Bullet(pygame.sprite.Sprite):
         self.rect.x += self.vel_x
 
         # проверяем на выход за границы экрана
+        # самоуничтожение если вышли за грани
         if self.rect.y < -10:
             self.kill()
 
@@ -76,13 +95,22 @@ class Bullet(pygame.sprite.Sprite):
 
         if self.rect.x <= -30:
             self.kill()
-
+        # проверка на столкновение
+        # описывем логику столкновений
+        # рассомтрим все метеориты
         for sprite_m in meteors:
+            # проверим по маске
             if pygame.sprite.collide_mask(self, sprite_m):
+                # взрывы и вспышки при столкновеии
                 bullets_flashes.add(Muzzle_flash(self.rect.y, self.rect.x))
+                shield_explosions.add(sprite_m.collided_with_shield())
+                # уничтожение спрайтов
                 sprite_m.kill()
+                stats.targets_destroyed += 1
                 self.kill()
+                # звуки при столкновении
                 self.hit_sound()
+
                 print('bullet hit')
 
 
@@ -136,15 +164,26 @@ class Meteor(pygame.sprite.Sprite):
         # проверяем на столкновение с игроком
         if pygame.sprite.collide_mask(self, space_ship):
             if self.type == 3:
-                for i in shield:
-                    i.kill()
+                self.kill()
+                stats.overall_shields += 1
                 shield.add(Shield_for_player(space_ship.get_x(), space_ship.get_y()))
                 self.shield_gain.play()
-            print('collision with meteor')
+            else:
+
+                print('collision with meteor')
 
     # функция стрельбы
     def create_bullet(self):
         return Enemy_bullet(self.rect.x + 49, self.rect.y + 5, "laserRed.png", -7)
+
+    # функция для взрыва обьекта после столкновения с щитом
+    def collided_with_shield(self):
+        return Shield_explosion(self.rect.centerx, self.rect.centery, self.image.get_size())
+
+    # узнаем тарелка ли это или нет
+    def get_type(self):
+        if self.type == 3:
+            return "bonus"
 
 
 class Enemy_bullet(pygame.sprite.Sprite):
@@ -163,12 +202,17 @@ class Enemy_bullet(pygame.sprite.Sprite):
         # проверяем на выход за границы экрана
         if self.rect.y < -10:
             self.kill()
-
+        # проверим на столкновение
         if pygame.sprite.collide_mask(self, space_ship):
             self.kill()
             print('player hit')
 
+    # будем добавлять вспышки
+    def add_flash(self):
+        return Enemy_muzzle_flash(self.rect.centerx, self.rect.centery)
 
+
+#для вспышки при столкновении с нашей пулей
 class Muzzle_flash(pygame.sprite.Sprite):
     def __init__(self, pos_y, pos_x):
         super().__init__()
@@ -184,14 +228,33 @@ class Muzzle_flash(pygame.sprite.Sprite):
             self.kill()
 
 
+# для вспышки при столкновении с вражетской пулей
+class Enemy_muzzle_flash(pygame.sprite.Sprite):
+    def __init__(self, pos_x, pos_y):
+        super().__init__()
+        self.image = pygame.image.load("laserRedShot.png").convert_alpha()
+        self.rect = self.image.get_rect()
+        self.rect.centerx, self.rect.centery = pos_x, pos_y
+        self.num = 0
+
+    # логика и движениеsa
+    def update(self):
+        self.num += 1
+        if self.num == 10:
+            self.kill()
+
+
+# для щита
 class Shield_for_player(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
         super().__init__()
         self.pos_x = pos_x
         self.pos_y = pos_y
-        self.image = pygame.image.load("shield.png").convert_alpha()
+        self.image = pygame.image.load("spr_shield.png").convert_alpha()
+        self.image = pygame.transform.scale(self.image, (151, 118))
         self.rect = self.image.get_rect()
-        self.rect.center = (pos_x, pos_y)
+        self.rect.centerx, self.rect.centery = pos_x, pos_y
+        # будем вести щет столкновений с щитом
         self.collided = 0
         self.mask = pygame.mask.from_surface(self.image)
         self.col_sound = [pygame.mixer.Sound("clink1.wav"), pygame.mixer.Sound("retro_misc_01.ogg"),
@@ -204,23 +267,71 @@ class Shield_for_player(pygame.sprite.Sprite):
     # защищаем корабль
     # логика и движение
     def update(self, pos_x, pos_y):
-        self.rect.center = (pos_x, pos_y)
+        self.rect.centerx, self.rect.centery = pos_x, pos_y
+        for meteor_m in pygame.sprite.spritecollide(self, meteors, False, pygame.sprite.collide_mask):
+            if meteor_m.get_type() != "bonus":
+                self.collided += 1
+                self.collision_sound()
+                shield_explosions.add(meteor_m.collided_with_shield())
+                meteor_m.kill()
+                print("collision with shield")
 
-        if pygame.sprite.spritecollide(self, meteors, True):
+        for bullet in pygame.sprite.spritecollide(self, enemy_bullets, False, pygame.sprite.collide_mask):
             self.collided += 1
             self.collision_sound()
-            print("collision with shield")
-
-        if pygame.sprite.spritecollide(self, enemy_bullets, True):
-            self.collided += 1
-            self.collision_sound()
+            enemy_flashes.add(bullet.add_flash())
+            bullet.kill()
             print('collision with shield')
 
         if self.collided >= 5:
             self.kill()
 
 
-# будем держать корабль в поле зрения
+# анимация взрыва
+class Shield_explosion(pygame.sprite.Sprite):
+    def __init__(self, pos_x, pos_y, scale):
+        super().__init__()
+        self.animation = ["bubble_explo2.png",
+                          "bubble_explo3.png", "bubble_explo4.png",
+                          "bubble_explo5.png", "bubble_explo6.png",
+                          "bubble_explo7.png", "bubble_explo8.png",
+                          "bubble_explo9.png", "bubble_explo10.png"]
+        self.image = pygame.image.load("bubble_explo1.png").convert_alpha()
+        self.image = pygame.transform.scale2x(self.image)
+        self.rect = self.image.get_rect()
+        self.rect.centerx, self.rect.centery = pos_x, pos_y
+        self.pos_x, self.pos_y = pos_x, pos_y
+        self.num = 0
+        self.scale = scale
+
+    # логика и движение
+    def update(self):
+        self.image = pygame.image.load(self.animation[int(self.num)]).convert_alpha()
+        self.image = pygame.transform.scale(self.image, self.scale)
+        self.rect = self.image.get_rect()
+        self.rect.centerx, self.rect.centery = self.pos_x, self.pos_y
+        self.num += 0.15
+        if int(self.num) == 8:
+            self.kill()
+
+
+class Statistics:
+    def __init__(self, targets_destroyed, overall_time, overall_shields, date_time, bullet_count, tri_bullet_count):
+        self.targets_destroyed = targets_destroyed
+        self.overall_time = overall_time
+        self.overall_shields = overall_shields
+        self.date_time = date_time
+        self.bullet_count = bullet_count
+        self.tri_bullet_count = tri_bullet_count
+
+    def get_stats(self):
+
+        return f'targets_destroyed {self.targets_destroyed} overall_time {self.overall_time} ' \
+               f'overall_shields {self.overall_shields} date_time {self.date_time} bullet_count {self.bullet_count}' \
+               f' tri_bullet_count {self.tri_bullet_count}'
+
+
+# будем держать корабль в поле зрения при его перемещении
 def keep_in_frame(type, num):
     if type == 1:
         if num >= 1000:
@@ -249,13 +360,15 @@ bullets = pygame.sprite.Group()
 enemy_bullets = pygame.sprite.Group()
 bullets_flashes = pygame.sprite.Group()
 shield = pygame.sprite.Group()
+shield_explosions = pygame.sprite.Group()
+enemy_flashes = pygame.sprite.Group()
 
 # группа для метеоров
 meteors = pygame.sprite.Group()
 
 # генерим меторы с периодичностью
 SAPWNMETEOR = pygame.USEREVENT
-pygame.time.set_timer(SAPWNMETEOR, 1200)
+pygame.time.set_timer(SAPWNMETEOR, 300)
 
 # прячем мышь
 pygame.mouse.set_visible(False)
@@ -275,28 +388,51 @@ cur_angle = 0
 
 # пауза
 do_pause = False
+# текущее количесво пуль в обойме
 bullet_bar = 5
-triple_bullet_bar = 1
+# максимальное количество пуль в обойме
+max_bullet_bar = 3
+# количество тройных супер пуль
+triple_bullet_bar = 4
 
 level_num = 0
+
+game_spped = 100
+# будем вести счет для текущей игры
+stats = Statistics(0, 0, 0, 0, 0, 0)
+
+# взрыв метеорита, подщет количества щитов, общее время игры
+# когда корабль сталкивается с круглешком то нудно показать индекатор прочнночти щита
+# индикатор количества пуль
+# меню входа
+# меню выхожа
+# меню паузы
+# индикаторы на
+# до понедельника
+# table: data, score, shield score, bullets' score
+
+shield_health = 0
+
 while True:
     for event in pygame.event.get():
+
         # если выходим из игры
         if event.type == pygame.QUIT:
+            print(stats.get_stats())
             pygame.quit()
             sys.exit()
 
         # описываем движение
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_RIGHT or event.key == pygame.K_d and not do_pause:
+            if (event.key == pygame.K_RIGHT or event.key == pygame.K_d) and not do_pause:
                 right = True
                 cur_angle = 1
-            if event.key == pygame.K_LEFT or event.key == pygame.K_a and not do_pause:
+            if (event.key == pygame.K_LEFT or event.key == pygame.K_a) and not do_pause:
                 left = True
                 cur_angle = 2
-            if event.key == pygame.K_DOWN or event.key == pygame.K_s and not do_pause:
+            if (event.key == pygame.K_DOWN or event.key == pygame.K_s) and not do_pause:
                 down = True
-            if event.key == pygame.K_UP or event.key == pygame.K_w and not do_pause:
+            if (event.key == pygame.K_UP or event.key == pygame.K_w) and not do_pause:
                 up = True
             if event.key == pygame.K_ESCAPE:
                 if do_pause:
@@ -305,21 +441,22 @@ while True:
                     do_pause = True
 
         if event.type == pygame.KEYUP:
-            if event.key == pygame.K_RIGHT or event.key == pygame.K_d and not do_pause:
+            if (event.key == pygame.K_RIGHT or event.key == pygame.K_d) and not do_pause:
                 right = False
                 cur_angle = 0
-            if event.key == pygame.K_LEFT or event.key == pygame.K_a and not do_pause:
+            if (event.key == pygame.K_LEFT or event.key == pygame.K_a) and not do_pause:
                 left = False
                 cur_angle = 0
-            if event.key == pygame.K_DOWN or event.key == pygame.K_s and not do_pause:
+            if (event.key == pygame.K_DOWN or event.key == pygame.K_s) and not do_pause:
                 down = False
-            if event.key == pygame.K_UP or event.key == pygame.K_w and not do_pause:
+            if (event.key == pygame.K_UP or event.key == pygame.K_w) and not do_pause:
                 up = False
 
         # описываем стрельбу
         if event.type == pygame.MOUSEBUTTONDOWN and not do_pause:
             if event.button == 1:
                 if bullet_bar > 0:
+                    stats.bullet_count += 1
                     space_ship.shoot()
                     bullets.add(space_ship.create_bullet(0, 5, 0))
                     bullet_bar -= 1
@@ -327,8 +464,10 @@ while True:
                     space_ship.beep()
 
             elif event.button == 3:
-                if triple_bullet_bar > 4:
+                if triple_bullet_bar >= 4:
                     triple_bullet_bar -= 4
+                    space_ship.shoot()
+                    stats.tri_bullet_count += 1
                     bullets.add(space_ship.create_bullet(0, 6, 0))
                     bullets.add(space_ship.create_bullet(0, 5, 1))
                     bullets.add(space_ship.create_bullet(0, 5, -1))
@@ -336,23 +475,32 @@ while True:
                     space_ship.beep()
 
         # генерим метеориты
-        if event.type == SAPWNMETEOR and not do_pause:
-            bullet_bar += 1
-            triple_bullet_bar += 1
-            if bullet_bar >= 5:
-                bullet_bar = 5
-            game_difficulty += 1
-            for met in range(random.randrange(6)):
-                meteors.add(Meteor(random.randrange(30, screen_w - 30), -1 * random.randrange(20, 500, 1),
-                                   random.randrange(0, 2), random.randrange(3, 6), 0))
-            if game_difficulty % 3 == 0:
-                meteors.add(
-                    Meteor(random.randrange(30, screen_w - 30), -1 * random.randrange(20, 500, 1), 3,
-                           random.randrange(3, 6), 0))
-            if game_difficulty % 2 == 0:
-                meteors.add(
-                    Meteor(random.randrange(30, screen_w - 30), -1 * random.randrange(20, 500, 1), 2,
-                           random.randrange(3, 6), 0))
+        if event.type == SAPWNMETEOR:
+            stats.overall_time += 0.3
+            if not do_pause:
+                bullet_bar += 1
+                triple_bullet_bar += 1
+                if triple_bullet_bar >= 4:
+                    triple_bullet_bar = 4
+                if bullet_bar >= max_bullet_bar:
+                    bullet_bar = max_bullet_bar
+                game_difficulty += 1
+                for met in range(random.randrange(2)):
+                    meteors.add(Meteor(random.randrange(30, screen_w - 30), -1 * random.randrange(20, 500, 1),
+                                       random.randrange(0, 2), random.randrange(3, 6), 0))
+                if game_difficulty % 12 == 0:
+                    meteors.add(
+                        Meteor(random.randrange(30, screen_w - 30), -1 * random.randrange(20, 500, 1), 3,
+                               random.randrange(3, 6), 0))
+
+                if game_difficulty % 6 == 0:
+                    meteors.add(
+                        Meteor(random.randrange(30, screen_w - 30), -1 * random.randrange(20, 500, 1), 2,
+                               random.randrange(3, 6), 0))
+
+                    meteors.add(
+                        Meteor(cur_pos_x + 45, -1 * random.randrange(20, 500, 1), 2,
+                               random.randrange(3, 6), 0))
 
     # двигаем корабль
     if up:
@@ -370,21 +518,25 @@ while True:
 
     # отрисовка
     screen.blit(background_surface, (0, 0))
-    space_ship_group.draw(screen)
     shield.draw(screen)
     bullets.draw(screen)
+    space_ship_group.draw(screen)
     enemy_bullets.draw(screen)
     meteors.draw(screen)
     bullets_flashes.draw(screen)
+    shield_explosions.draw(screen)
+    enemy_flashes.draw(screen)
 
     # обновление
     if not do_pause:
         space_ship_group.update(cur_pos_x, cur_pos_y, cur_angle)
         shield.update(cur_pos_x, cur_pos_y)
+        enemy_flashes.update()
         enemy_bullets.update()
         bullets.update()
         meteors.update()
         bullets_flashes.update()
+        shield_explosions.update()
 
     pygame.display.flip()
     clock.tick(120)
