@@ -372,14 +372,14 @@ def drawmenu():
 
 # экран вывода 5 лучших результатов
 def drawscores():
-    backgraund_image = pygame.transform.scale(pygame.image.load("menu.jpg").convert(), (screen_w, screen_l))
+    backgraund_image = pygame.transform.scale(pygame.image.load("background_space.jpg").convert(), (screen_w, screen_l))
     screen.blit(backgraund_image, (0, 0))
 
-    screen.blit(pygame.font.Font(None, 190).render("Result", 2, (255, 255, 255)), (320, 100))
+    screen.blit(pygame.font.Font(None, 190).render("Result", 2, (255, 255, 255)), (280, 50))
     results = new_result()
     for i in range(0, min(5, len(results))):
         player_score = f'{i + 1}.{results[i][0]} {results[i][1]} {results[i][2]} {results[i][3]}'
-        screen.blit(pygame.font.Font(None, 100).render(player_score, 2, (255, 255, 255)), (400, 200 + i * 100))
+        screen.blit(pygame.font.Font(None, 100).render(player_score, 2, (255, 255, 255)), (50, 150 + i * 100))
 
 
 # перезапуск игры когда игрок проигрывает
