@@ -1,6 +1,7 @@
 import random
 import sys
-
+import sqlite3
+from datetime import date
 import pygame
 
 # инициализация базовых вещей
@@ -27,7 +28,7 @@ class Space_ship(pygame.sprite.Sprite):
         self.bullets_paths = ["laserGreen.png", "laserRed.png"]
         # массив разных звуков стрельбы
         self.laser = pygame.mixer.Sound("laserfire01.ogg")
-        #звук для стрельбы при путой обойме(нет пуль)
+        # звук для стрельбы при путой обойме(нет пуль)
         self.beep_sound = [pygame.mixer.Sound("synth_beep_01.ogg"), pygame.mixer.Sound("synth_beep_02.ogg")]
 
     # логика и движение
@@ -62,13 +63,13 @@ class Space_ship(pygame.sprite.Sprite):
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y, path, velocity_y, velocity_x=0):
         super().__init__()
-        #грузим и рапологаем картинку
+        # грузим и рапологаем картинку
         self.image = pygame.image.load(path).convert_alpha()
         self.rect = self.image.get_rect()
         self.rect.center = [pos_x, pos_y]
         self.vel_x, self.vel_y = velocity_x, velocity_y
         self.mask = pygame.mask.from_surface(self.image)
-        #для разных звуков
+        # для разных звуков
         self.sounds = [
             pygame.mixer.Sound("retro_explosion_01.ogg"),
             pygame.mixer.Sound("retro_explosion_02.ogg"),
@@ -76,7 +77,7 @@ class Bullet(pygame.sprite.Sprite):
             pygame.mixer.Sound("retro_explosion_04.ogg"),
             pygame.mixer.Sound("retro_explosion_05.ogg")]
 
-    #воспроизводим звук
+    # воспроизводим звук
     def hit_sound(self):
         self.sounds[random.randrange(len(self.sounds))].play()
 
@@ -169,8 +170,9 @@ class Meteor(pygame.sprite.Sprite):
                 shield.add(Shield_for_player(space_ship.get_x(), space_ship.get_y()))
                 self.shield_gain.play()
             else:
-
-                print('collision with meteor')
+                global MENU, Reason
+                Reason = "colision with meteor"
+                restart()
 
     # функция стрельбы
     def create_bullet(self):
@@ -205,14 +207,16 @@ class Enemy_bullet(pygame.sprite.Sprite):
         # проверим на столкновение
         if pygame.sprite.collide_mask(self, space_ship):
             self.kill()
-            print('player hit')
+            restart()
+            global MENU, Reason
+            Reason = "player hit"
 
     # будем добавлять вспышки
     def add_flash(self):
         return Enemy_muzzle_flash(self.rect.centerx, self.rect.centery)
 
 
-#для вспышки при столкновении с нашей пулей
+# для вспышки при столкновении с нашей пулей
 class Muzzle_flash(pygame.sprite.Sprite):
     def __init__(self, pos_y, pos_x):
         super().__init__()
@@ -325,10 +329,12 @@ class Statistics:
         self.tri_bullet_count = tri_bullet_count
 
     def get_stats(self):
-
         return f'targets_destroyed {self.targets_destroyed} overall_time {self.overall_time} ' \
                f'overall_shields {self.overall_shields} date_time {self.date_time} bullet_count {self.bullet_count}' \
                f' tri_bullet_count {self.tri_bullet_count}'
+
+    def get__stats(self):
+        return self.targets_destroyed, self.overall_time, self.overall_shields, self.date_time, self.bullet_count, self.tri_bullet_count
 
 
 # будем держать корабль в поле зрения при его перемещении
@@ -344,6 +350,80 @@ def keep_in_frame(type, num):
         if num <= 0:
             num = 0
     return num
+
+
+# отрисовка меню
+def drawmenu():
+    backgraund_image = pygame.transform.scale(pygame.image.load("menu.jpg").convert(), (screen_w, screen_l))
+    screen.blit(backgraund_image, (0, 0))
+    arrow_image = pygame.transform.scale(pygame.image.load("arrow1.png").convert_alpha(), (100, 50))
+    if state == 0:
+        screen.blit(arrow_image, (300, 250))
+    if state == 1:
+        screen.blit(arrow_image, (300, 400))
+    if state == 2:
+        screen.blit(arrow_image, (300, 550))
+
+    screen.blit(pygame.font.Font(None, 170).render("SPACE GAME", 2, (200, 100, 50)), (150, 100))
+    screen.blit(pygame.font.Font(None, 150).render("Play", 2, (255, 255, 255)), (400, 250))
+    screen.blit(pygame.font.Font(None, 150).render("Result", 2, (255, 255, 255)), (400, 400))
+    screen.blit(pygame.font.Font(None, 150).render("Exit", 2, (255, 255, 255)), (400, 550))
+
+
+# экран вывода 5 лучших результатов
+def drawscores():
+    backgraund_image = pygame.transform.scale(pygame.image.load("menu.jpg").convert(), (screen_w, screen_l))
+    screen.blit(backgraund_image, (0, 0))
+
+    screen.blit(pygame.font.Font(None, 190).render("Result", 2, (255, 255, 255)), (320, 100))
+    results = new_result()
+    for i in range(0, min(5, len(results))):
+        player_score = f'{i + 1}.{results[i][0]} {results[i][1]} {results[i][2]} {results[i][3]}'
+        screen.blit(pygame.font.Font(None, 100).render(player_score, 2, (255, 255, 255)), (400, 200 + i * 100))
+
+
+# перезапуск игры когда игрок проигрывает
+def restart():
+    score_writer(f"{date.today().day}/{date.today().month}/{date.today().year}", stats.get__stats()[0],
+                 stats.get__stats()[2], stats.get__stats()[-1] + stats.get__stats()[-2])
+    global MENU, meteors, space_ship, space_ship_group, bullets, enemy_bullets, bullets_flashes, shield, shield_explosions, enemy_flashes
+    MENU = 3
+    meteors = pygame.sprite.Group()
+    space_ship = Space_ship(0, 500, 600)
+    space_ship_group = pygame.sprite.Group()
+    space_ship_group.add(space_ship)
+    bullets = pygame.sprite.Group()
+    enemy_bullets = pygame.sprite.Group()
+    bullets_flashes = pygame.sprite.Group()
+    shield = pygame.sprite.Group()
+    shield_explosions = pygame.sprite.Group()
+    enemy_flashes = pygame.sprite.Group()
+
+
+# конец игры + объяснение причины
+def drawgameover():
+    backgraund_image = pygame.transform.scale(pygame.image.load("background_space.jpg").convert(), (screen_w, screen_l))
+    screen.blit(backgraund_image, (0, 0))
+
+    screen.blit(pygame.font.Font(None, 190).render("Game over", 2, (255, 0, 0)), (190, 100))
+    global Reason
+    screen.blit(pygame.font.Font(None, 100).render(Reason, 2, (255, 0, 0)), (230, 250))
+    screen.blit(pygame.font.Font(None, 50).render("press enter to return to menu", 2, (255, 255, 255)), (300, 400))
+
+
+def score_writer(x, y, z, c):
+    a = sqlite3.connect("data.db")
+    b = a.cursor()
+    b.execute(f"INSERT INTO result(data,score,shield_score,bullets_score) VALUES(?,?,?,?)", (x, y, z, c))
+    a.commit()
+    a.close()
+
+
+def new_result():
+    a = sqlite3.connect("data.db")
+    b = a.cursor()
+    c = b.execute("SELECT * FROM result").fetchall()
+    return sorted(c, reverse=True, key=lambda x: x[1])
 
 
 # загружаем фон космоса
@@ -388,6 +468,12 @@ cur_angle = 0
 
 # пауза
 do_pause = False
+# открыто меню либо игра
+MENU = 1
+# причина проигрыша
+Reason = ""
+# для перемещения стрелки
+state = 0
 # текущее количесво пуль в обойме
 bullet_bar = 5
 # максимальное количество пуль в обойме
@@ -414,129 +500,179 @@ stats = Statistics(0, 0, 0, 0, 0, 0)
 shield_health = 0
 
 while True:
-    for event in pygame.event.get():
+    if MENU == 1:
+        for event in pygame.event.get():
 
-        # если выходим из игры
-        if event.type == pygame.QUIT:
-            print(stats.get_stats())
-            pygame.quit()
-            sys.exit()
+            # если выходим из игры
+            if event.type == pygame.QUIT:
+                print(stats.get_stats())
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    state = (state - 1 + 3) % 3
+                if event.key == pygame.K_DOWN:
+                    state = (state + 1) % 3
+                if event.key == pygame.K_RETURN:
+                    if state == 0:
+                        MENU = 0
+                    if state == 1:
+                        MENU = 2
+                    if state == 2:
+                        pygame.quit()
+                        sys.exit()
+        drawmenu()
 
-        # описываем движение
-        if event.type == pygame.KEYDOWN:
-            if (event.key == pygame.K_RIGHT or event.key == pygame.K_d) and not do_pause:
-                right = True
-                cur_angle = 1
-            if (event.key == pygame.K_LEFT or event.key == pygame.K_a) and not do_pause:
-                left = True
-                cur_angle = 2
-            if (event.key == pygame.K_DOWN or event.key == pygame.K_s) and not do_pause:
-                down = True
-            if (event.key == pygame.K_UP or event.key == pygame.K_w) and not do_pause:
-                up = True
-            if event.key == pygame.K_ESCAPE:
-                if do_pause:
-                    do_pause = False
-                else:
-                    do_pause = True
+    if MENU == 0:
+        for event in pygame.event.get():
 
-        if event.type == pygame.KEYUP:
-            if (event.key == pygame.K_RIGHT or event.key == pygame.K_d) and not do_pause:
-                right = False
-                cur_angle = 0
-            if (event.key == pygame.K_LEFT or event.key == pygame.K_a) and not do_pause:
-                left = False
-                cur_angle = 0
-            if (event.key == pygame.K_DOWN or event.key == pygame.K_s) and not do_pause:
-                down = False
-            if (event.key == pygame.K_UP or event.key == pygame.K_w) and not do_pause:
-                up = False
+            # если выходим из игры
+            if event.type == pygame.QUIT:
+                print(stats.get_stats())
+                pygame.quit()
+                sys.exit()
 
-        # описываем стрельбу
-        if event.type == pygame.MOUSEBUTTONDOWN and not do_pause:
-            if event.button == 1:
-                if bullet_bar > 0:
-                    stats.bullet_count += 1
-                    space_ship.shoot()
-                    bullets.add(space_ship.create_bullet(0, 5, 0))
-                    bullet_bar -= 1
-                else:
-                    space_ship.beep()
+            # описываем движение
+            if event.type == pygame.KEYDOWN:
+                if (event.key == pygame.K_RIGHT or event.key == pygame.K_d) and not do_pause:
+                    right = True
+                    cur_angle = 1
+                if (event.key == pygame.K_LEFT or event.key == pygame.K_a) and not do_pause:
+                    left = True
+                    cur_angle = 2
+                if (event.key == pygame.K_DOWN or event.key == pygame.K_s) and not do_pause:
+                    down = True
+                if (event.key == pygame.K_UP or event.key == pygame.K_w) and not do_pause:
+                    up = True
+                if event.key == pygame.K_ESCAPE:
+                    if do_pause:
+                        do_pause = False
+                    else:
+                        do_pause = True
 
-            elif event.button == 3:
-                if triple_bullet_bar >= 4:
-                    triple_bullet_bar -= 4
-                    space_ship.shoot()
-                    stats.tri_bullet_count += 1
-                    bullets.add(space_ship.create_bullet(0, 6, 0))
-                    bullets.add(space_ship.create_bullet(0, 5, 1))
-                    bullets.add(space_ship.create_bullet(0, 5, -1))
-                else:
-                    space_ship.beep()
+            if event.type == pygame.KEYUP:
+                if (event.key == pygame.K_RIGHT or event.key == pygame.K_d) and not do_pause:
+                    right = False
+                    cur_angle = 0
+                if (event.key == pygame.K_LEFT or event.key == pygame.K_a) and not do_pause:
+                    left = False
+                    cur_angle = 0
+                if (event.key == pygame.K_DOWN or event.key == pygame.K_s) and not do_pause:
+                    down = False
+                if (event.key == pygame.K_UP or event.key == pygame.K_w) and not do_pause:
+                    up = False
 
-        # генерим метеориты
-        if event.type == SAPWNMETEOR:
-            stats.overall_time += 0.3
-            if not do_pause:
-                bullet_bar += 1
-                triple_bullet_bar += 1
-                if triple_bullet_bar >= 4:
-                    triple_bullet_bar = 4
-                if bullet_bar >= max_bullet_bar:
-                    bullet_bar = max_bullet_bar
-                game_difficulty += 1
-                for met in range(random.randrange(2)):
-                    meteors.add(Meteor(random.randrange(30, screen_w - 30), -1 * random.randrange(20, 500, 1),
-                                       random.randrange(0, 2), random.randrange(3, 6), 0))
-                if game_difficulty % 12 == 0:
-                    meteors.add(
-                        Meteor(random.randrange(30, screen_w - 30), -1 * random.randrange(20, 500, 1), 3,
-                               random.randrange(3, 6), 0))
+            # описываем стрельбу
+            if event.type == pygame.MOUSEBUTTONDOWN and not do_pause:
+                if event.button == 1:
+                    if bullet_bar > 0:
+                        stats.bullet_count += 1
+                        space_ship.shoot()
+                        bullets.add(space_ship.create_bullet(0, 5, 0))
+                        bullet_bar -= 1
+                    else:
+                        space_ship.beep()
 
-                if game_difficulty % 6 == 0:
-                    meteors.add(
-                        Meteor(random.randrange(30, screen_w - 30), -1 * random.randrange(20, 500, 1), 2,
-                               random.randrange(3, 6), 0))
+                elif event.button == 3:
+                    if triple_bullet_bar >= 4:
+                        triple_bullet_bar -= 4
+                        space_ship.shoot()
+                        stats.tri_bullet_count += 1
+                        bullets.add(space_ship.create_bullet(0, 6, 0))
+                        bullets.add(space_ship.create_bullet(0, 5, 1))
+                        bullets.add(space_ship.create_bullet(0, 5, -1))
+                    else:
+                        space_ship.beep()
 
-                    meteors.add(
-                        Meteor(cur_pos_x + 45, -1 * random.randrange(20, 500, 1), 2,
-                               random.randrange(3, 6), 0))
+            # генерим метеориты
+            if event.type == SAPWNMETEOR:
+                stats.overall_time += 0.3
+                if not do_pause:
+                    bullet_bar += 1
+                    triple_bullet_bar += 1
+                    if triple_bullet_bar >= 4:
+                        triple_bullet_bar = 4
+                    if bullet_bar >= max_bullet_bar:
+                        bullet_bar = max_bullet_bar
+                    game_difficulty += 1
+                    for met in range(random.randrange(2)):
+                        meteors.add(Meteor(random.randrange(30, screen_w - 30), -1 * random.randrange(20, 500, 1),
+                                           random.randrange(0, 2), random.randrange(3, 6), 0))
+                    if game_difficulty % 12 == 0:
+                        meteors.add(
+                            Meteor(random.randrange(30, screen_w - 30), -1 * random.randrange(20, 500, 1), 3,
+                                   random.randrange(3, 6), 0))
 
-    # двигаем корабль
-    if up:
-        cur_pos_y -= ship_velocity
-        cur_pos_y = keep_in_frame(2, cur_pos_y)
-    if down:
-        cur_pos_y += ship_velocity
-        cur_pos_y = keep_in_frame(2, cur_pos_y)
-    if right:
-        cur_pos_x += ship_velocity
-        cur_pos_x = keep_in_frame(1, cur_pos_x)
-    if left:
-        cur_pos_x -= ship_velocity
-        cur_pos_x = keep_in_frame(1, cur_pos_x)
+                    if game_difficulty % 6 == 0:
+                        meteors.add(
+                            Meteor(random.randrange(30, screen_w - 30), -1 * random.randrange(20, 500, 1), 2,
+                                   random.randrange(3, 6), 0))
 
-    # отрисовка
-    screen.blit(background_surface, (0, 0))
-    shield.draw(screen)
-    bullets.draw(screen)
-    space_ship_group.draw(screen)
-    enemy_bullets.draw(screen)
-    meteors.draw(screen)
-    bullets_flashes.draw(screen)
-    shield_explosions.draw(screen)
-    enemy_flashes.draw(screen)
+                        meteors.add(
+                            Meteor(cur_pos_x + 45, -1 * random.randrange(20, 500, 1), 2,
+                                   random.randrange(3, 6), 0))
 
-    # обновление
-    if not do_pause:
-        space_ship_group.update(cur_pos_x, cur_pos_y, cur_angle)
-        shield.update(cur_pos_x, cur_pos_y)
-        enemy_flashes.update()
-        enemy_bullets.update()
-        bullets.update()
-        meteors.update()
-        bullets_flashes.update()
-        shield_explosions.update()
+        # двигаем корабль
+        if up:
+            cur_pos_y -= ship_velocity
+            cur_pos_y = keep_in_frame(2, cur_pos_y)
+        if down:
+            cur_pos_y += ship_velocity
+            cur_pos_y = keep_in_frame(2, cur_pos_y)
+        if right:
+            cur_pos_x += ship_velocity
+            cur_pos_x = keep_in_frame(1, cur_pos_x)
+        if left:
+            cur_pos_x -= ship_velocity
+            cur_pos_x = keep_in_frame(1, cur_pos_x)
+
+        # отрисовка
+        c = stats.get__stats()
+
+        screen.blit(background_surface, (0, 0))
+        shield.draw(screen)
+        bullets.draw(screen)
+        space_ship_group.draw(screen)
+        enemy_bullets.draw(screen)
+        meteors.draw(screen)
+        bullets_flashes.draw(screen)
+        shield_explosions.draw(screen)
+        enemy_flashes.draw(screen)
+        screen.blit(pygame.font.Font(None, 50).render(str(c[0]), 2, (200, 100, 50)), (0, 0))
+
+        # обновление
+        if not do_pause:
+            space_ship_group.update(cur_pos_x, cur_pos_y, cur_angle)
+            shield.update(cur_pos_x, cur_pos_y)
+            enemy_flashes.update()
+            enemy_bullets.update()
+            bullets.update()
+            meteors.update()
+            bullets_flashes.update()
+            shield_explosions.update()
+        else:
+            screen.blit(pygame.font.Font(None, 150).render("Pause", 2, (255, 0, 0)), (350, 250))
+    if MENU == 2:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                print(stats.get_stats())
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    MENU = 1
+        drawscores()
+
+    if MENU == 3:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                print(stats.get_stats())
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    MENU = 1
+        drawgameover()
 
     pygame.display.flip()
     clock.tick(120)
