@@ -364,7 +364,7 @@ def drawmenu():
     if state == 2:
         screen.blit(arrow_image, (300, 550))
 
-    screen.blit(pygame.font.Font(None, 170).render("SPACE GAME", 2, (200, 100, 50)), (150, 100))
+    screen.blit(pygame.font.Font(None, 170).render("SPACE MISSION", 2, (200, 100, 50)), (150, 100))
     screen.blit(pygame.font.Font(None, 150).render("Play", 2, (255, 255, 255)), (400, 250))
     screen.blit(pygame.font.Font(None, 150).render("Result", 2, (255, 255, 255)), (400, 400))
     screen.blit(pygame.font.Font(None, 150).render("Exit", 2, (255, 255, 255)), (400, 550))
