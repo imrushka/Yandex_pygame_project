@@ -504,10 +504,10 @@ game_spped = 100
 # будем вести счет для текущей игры
 stats = Statistics(0, 0, 0, 0, 0, 0)
 shield_health = 0
-pygame.mixer.Sound("Tony-igy-astronomia_Kamola.net.mp3").play()
+pygame.mixer.Sound("Tony-igy-astronomia_Kamola.net.mp3").play().set_volume(0.2)
 while True:
     if not pygame.mixer.get_busy():
-        pygame.mixer.Sound("Tony-igy-astronomia_Kamola.net.mp3").play()
+        pygame.mixer.Sound("Tony-igy-astronomia_Kamola.net.mp3").play().set_volume(0.2)
 
     if MENU == 1:
         for event in pygame.event.get():
