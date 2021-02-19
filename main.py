@@ -167,12 +167,17 @@ class Meteor(pygame.sprite.Sprite):
             if self.type == 3:
                 self.kill()
                 stats.overall_shields += 1
+                for i in shield:
+                    i.kill()
                 shield.add(Shield_for_player(space_ship.get_x(), space_ship.get_y()))
                 self.shield_gain.play()
             else:
                 global MENU, Reason
                 pygame.mixer.Sound("retro_die_01.ogg").play()
-                Reason = "colision with meteor"
+                if self.type == 2:
+                    Reason = "collision with enemy"
+                else:
+                    Reason = "collision with meteor"
                 restart()
 
 
@@ -208,11 +213,12 @@ class Enemy_bullet(pygame.sprite.Sprite):
             self.kill()
         # проверим на столкновение
         if pygame.sprite.collide_mask(self, space_ship):
-            self.kill()
+            screen.blit(pygame.transform.scale(pygame.image.load("laserRedShot.png").convert_alpha(), (30, 30)),
+                        [self.rect.x - 11, self.rect.y + 15])
             restart()
             global MENU, Reason
             pygame.mixer.Sound("retro_die_02.ogg").play()
-            Reason = "player hit"
+            Reason = "enemy hit you"
 
     # будем добавлять вспышки
     def add_flash(self):
@@ -366,36 +372,46 @@ def keep_in_frame(type, num):
 
 # отрисовка меню
 def drawmenu():
-    backgraund_image = pygame.transform.scale(pygame.image.load("menu.jpg").convert(), (screen_w, screen_l))
+    backgraund_image = pygame.transform.scale(pygame.image.load("background_space.jpg").convert(), (screen_w, screen_l))
     screen.blit(backgraund_image, (0, 0))
     arrow_image = pygame.transform.scale(pygame.image.load("arrow1.png").convert_alpha(), (100, 50))
     if state == 0:
-        screen.blit(arrow_image, (300, 250))
+        screen.blit(arrow_image, (100, 250))
     if state == 1:
-        screen.blit(arrow_image, (300, 400))
+        screen.blit(arrow_image, (100, 400))
     if state == 2:
-        screen.blit(arrow_image, (300, 550))
+        screen.blit(arrow_image, (100, 550))
 
-    screen.blit(pygame.font.Font(None, 150).render("SPACE MISSION", 1, (200, 100, 50)), (130, 100))
-    screen.blit(pygame.font.Font(None, 150).render("Play", 2, (255, 255, 255)), (400, 250))
-    screen.blit(pygame.font.Font(None, 150).render("Result", 2, (255, 255, 255)), (400, 400))
-    screen.blit(pygame.font.Font(None, 150).render("Exit", 2, (255, 255, 255)), (400, 550))
+    screen.blit(pygame.font.Font(None, 150).render("SPACE MISSION", 1, (200, 100, 50)), (80, 80))
+    screen.blit(pygame.font.Font(None, 150).render("Play", 2, (255, 255, 255)), (200, 220))
+    screen.blit(pygame.font.Font(None, 150).render("Result", 2, (255, 255, 255)), (200, 370))
+    screen.blit(pygame.font.Font(None, 150).render("Exit", 2, (255, 255, 255)), (200, 520))
+    screen.blit(pygame.font.Font(None, 80).render("Iskakov Imran", 2, (255, 255, 255)), (600, 640))
 
 
 # экран вывода 5 лучших результатов
 def drawscores():
     backgraund_image = pygame.transform.scale(pygame.image.load("background_space.jpg").convert(), (screen_w, screen_l))
     screen.blit(backgraund_image, (0, 0))
-
     screen.blit(pygame.font.Font(None, 100).render("Results", 2, (255, 255, 255)), (280, 20))
-    screen.blit(pygame.font.Font(None, 50).render("date", 2, (255, 255, 255)), (200, 100))
-    screen.blit(pygame.font.Font(None, 50).render("score", 2, (255, 255, 255)), (460, 100))
-    screen.blit(pygame.font.Font(None, 50).render("shields", 2, (255, 255, 255)), (620, 100))
-    screen.blit(pygame.font.Font(None, 50).render("bullets", 2, (255, 255, 255)), (800, 100))
+    screen.blit(pygame.font.Font(None, 50).render("date", 2, (255, 0, 0)), (200, 100))
+    screen.blit(pygame.font.Font(None, 50).render("score", 2, (0, 255, 0)), (460, 100))
+    screen.blit(pygame.font.Font(None, 50).render("shields", 2, (0, 0, 255)), (620, 100))
+    screen.blit(pygame.font.Font(None, 50).render("bullets", 2, (255, 255, 0)), (800, 100))
     results = new_result()
     for i in range(0, min(5, len(results))):
         player_score = f'{i + 1}.{results[i][0]}   {results[i][1]}      {results[i][2]}      {results[i][3]}'
-        screen.blit(pygame.font.Font(None, 100).render(player_score, 2, (255, 255, 255)), (50, 150 + i * 100))
+        screen.blit(
+            pygame.font.Font(None, 100).render(f'{i + 1}.{results[i][0]}', 2, (255, 255 - i * 50, 255 - i * 50)),
+            (200 - 150, 150 + i * 100))
+        screen.blit(pygame.font.Font(None, 100).render(f'{results[i][1]}', 2, (255 - i * 50, 255, 255 - i * 50)),
+                    (460, 150 + i * 100))
+        screen.blit(pygame.font.Font(None, 100).render(f'{results[i][2]}', 2, (255 - i * 50, 255 - i * 50, 255)),
+                    (620, 150 + i * 100))
+        screen.blit(pygame.font.Font(None, 100).render(f'{results[i][3]}', 2, (255, 255, 255 - i * 50)),
+                    (800, 150 + i * 100))
+
+    screen.blit(pygame.font.Font(None, 50).render("press enter to return to main menu", 2, (255, 255, 255)), (50, 630))
 
 
 # перезапуск игры когда игрок проигрывает
@@ -504,10 +520,10 @@ game_spped = 100
 # будем вести счет для текущей игры
 stats = Statistics(0, 0, 0, 0, 0, 0)
 shield_health = 0
-pygame.mixer.Sound("Tony-igy-astronomia_Kamola.net.mp3").play().set_volume(0.2)
+pygame.mixer.Sound("Tony-igy-astronomia_Kamola.net.mp3").play().set_volume(0.1)
 while True:
     if not pygame.mixer.get_busy():
-        pygame.mixer.Sound("Tony-igy-astronomia_Kamola.net.mp3").play().set_volume(0.2)
+        pygame.mixer.Sound("Tony-igy-astronomia_Kamola.net.mp3").play().set_volume(0.1)
 
     if MENU == 1:
         for event in pygame.event.get():
@@ -578,7 +594,7 @@ while True:
             # описываем стрельбу
             if event.type == pygame.MOUSEBUTTONDOWN and not do_pause:
                 if event.button == 1:
-                    if bullet_bar > 0:
+                    if int(bullet_bar) > 0:
                         stats.bullet_count += 1
                         space_ship.shoot()
                         bullets.add(space_ship.create_bullet(0, 5, 0))
@@ -599,9 +615,10 @@ while True:
 
             # генерим метеориты
             if event.type == SAPWNMETEOR:
-                stats.overall_time += 0.3
+
                 if not do_pause:
-                    bullet_bar += 1
+                    stats.overall_time += 0.3
+                    bullet_bar += 0.3
                     triple_bullet_bar += 1
                     if triple_bullet_bar >= 4:
                         triple_bullet_bar = 4
@@ -651,7 +668,8 @@ while True:
         bullets_flashes.draw(screen)
         shield_explosions.draw(screen)
         enemy_flashes.draw(screen)
-        screen.blit(pygame.font.Font(None, 50).render(str(c[0]), 2, (200, 100, 50)), (0, 0))
+        screen.blit(pygame.font.Font(None, 90).render(f'{str(c[0])}', 2, (200, 100, 50)), (5, 0))
+        screen.blit(pygame.font.Font(None, 50).render(f'{(str(c[1]))[:3]}', 2, (200, 100, 50)), (5, 50))
 
         # обновление
         if not do_pause:
